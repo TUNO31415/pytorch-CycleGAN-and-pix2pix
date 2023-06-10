@@ -7,7 +7,8 @@ import csv
 import sys
 import torch
 import torchvision.transforms as transforms
-from models import find_model_using_name
+from models import create_model
+from options.test_options import TestOptions
 
 
 def load_resized_img(path):
@@ -94,9 +95,16 @@ def main():
     MAPPING_PATH = "/Users/taichi/Documents/Github/pytorch-CycleGAN-and-pix2pix/scripts/eval_cityscapes/name mapping.csv"
     # images = process_cityscapes(IMAGE_PATH, OUTPUT_PATH)
 
-    model = find_model_using_name("cycle_gan")
-    model.load_state_dict(torch.load(os.path.join(MODEL_PATH, "latest_net_G_B.pth")))
-    model.eval()
+    opt = TestOptions().parse()  # get test options
+    # hard-code some parameters for test
+    opt.num_threads = 0   # test code only supports num_threads = 0
+    opt.batch_size = 1    # test code only supports batch_size = 1
+    opt.serial_batches = True  # disable data shuffling; comment this line if results on randomly chosen images are needed.
+    opt.no_flip = True    # no flip; comment this line if results on flipped images are needed.
+
+    model = create_model(opt)
+    # model = find_model_using_name("cycle_gan")
+    model.setup(opt)
 
     val2_path = os.path.join(OUTPUT_PATH + "/*/*.jpg")
     val2_path = glob.glob(val2_path)
@@ -106,11 +114,10 @@ def main():
 
     for p in val2_path:
         image = load_and_preprocess_image(p)
-        output = model(image)
+        model.set_input(image)
+        output = model.get_current_visuals()
         output_image = Image.fromarray(output.numpy())
-
         image_name = os.path.basename(p)
-
         orignal_name = name_mapping[image_name]
         path_area = os.path.sep.join(orignal_name.split(os.path.sep)[-1:])
 
